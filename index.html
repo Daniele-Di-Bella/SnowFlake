@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>🔬 LabHub // Portal</title>
+  <title>❄️ SnowFlake</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -37,13 +37,20 @@
   <!-- Firebase SDK Modules via CDN -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     window.FirebaseInit = {
       initializeApp,
       getAuth,
-      signInAnonymously,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged,
       getFirestore,
       doc,
       setDoc,
@@ -78,505 +85,436 @@
 
 <div id="app" class="min-h-screen flex flex-col max-w-5xl mx-auto px-3 sm:px-6 pb-12 font-mono overflow-x-hidden">
 
-  <!-- HEADER -->
-  <header class="py-4 border-b border-[#30363d] flex items-center justify-between gap-2 shrink-0">
-    <div class="flex items-center gap-2 min-w-0 pr-1">
-      <span class="text-xl sm:text-2xl shrink-0">🔬</span>
-      <div class="min-w-0">
-        <div class="flex items-center gap-2">
-          <h1 class="text-base sm:text-lg font-bold text-white tracking-tight truncate">LabHub</h1>
-          <!-- Realtime Sync Badge Indicator -->
-          <span 
-            :class="[
-              'text-[9px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all',
-              syncStatus === 'live' ? 'bg-emerald-950 text-emerald-300 border-emerald-700' : 'bg-amber-950 text-amber-300 border-amber-700'
-            ]"
-            :title="syncStatus === 'live' ? 'Sincronizzazione cloud istantanea attiva per PC e smartphone' : 'Modalità memoria locale'"
-          >
-            <span class="w-1.5 h-1.5 rounded-full" :class="syncStatus === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
-            <span>{{ syncStatus === 'live' ? 'LIVE SYNC' : 'LOCAL' }}</span>
-          </span>
+    <!-- SCHERMATA DI LOGIN (Mostrata solo se non autenticati) -->
+    <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center p-4">
+      <div class="bg-[#161b22] border border-[#30363d] p-6 sm:p-8 rounded-xl max-w-md w-full shadow-2xl space-y-4">
+        <div class="text-center space-y-1">
+          <span class="text-4xl">❄️</span>
+          <h2 class="text-xl font-bold text-white">Accesso Riservato</h2>
+          <p class="text-xs text-[#8b949e]">Inserisci le tue credenziali di laboratorio per accedere a SnowFlake</p>
         </div>
-        <p class="text-[10px] sm:text-xs text-[#8b949e] truncate">Gestione Dipartimento & Laboratori</p>
+
+        <form @submit.prevent="login" class="space-y-3">
+          <div>
+            <label class="block text-[11px] text-[#8b949e] mb-1">EMAIL</label>
+            <input 
+              v-model="loginEmail" 
+              type="email" 
+              required 
+              placeholder="collega@laboratorio.it" 
+              class="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+            >
+          </div>
+          <div>
+            <label class="block text-[11px] text-[#8b949e] mb-1">PASSWORD</label>
+            <input 
+              v-model="loginPassword" 
+              type="password" 
+              required 
+              placeholder="••••••••" 
+              class="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
+            >
+          </div>
+
+          <div v-if="authError" class="text-xs text-red-400 bg-red-950/40 border border-red-800 p-2 rounded">
+            {{ authError }}
+          </div>
+
+          <button 
+            type="submit" 
+            :disabled="isLoggingIn" 
+            class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-2.5 rounded-lg transition disabled:opacity-50"
+          >
+            {{ isLoggingIn ? 'Autenticazione in corso...' : 'Accedi al Sito' }}
+          </button>
+        </form>
       </div>
     </div>
 
-    <!-- Active User Identity Selector & Lock Controls -->
-    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto justify-end">
-      <div class="relative">
-        <button 
-          @click="isIdentityDropdownOpen = !isIdentityDropdownOpen"
-          :disabled="isIdentityLocked"
-          :class="[
-            'bg-[#161b22] text-white border text-xs rounded-lg px-2 sm:px-3 py-2 outline-none flex items-center gap-1.5 sm:gap-2 transition shadow-sm touch-target',
-            isIdentityLocked ? 'border-emerald-500/80 bg-emerald-950/30 text-emerald-300 font-bold opacity-100 cursor-not-allowed' : 'border-[#30363d] hover:border-emerald-500 cursor-pointer'
-          ]"
-          :title="isIdentityLocked ? 'Identità Bloccata (Sblocca per cambiare utente)' : 'Cambia Utente Attivo'"
-        >
-          <span class="text-base leading-none">{{ currentUser.emoji }}</span>
-          <div class="hidden sm:block text-left">
-            <div class="font-bold leading-tight">{{ currentUser.name }}</div>
-            <div class="text-[9px] text-[#8b949e] uppercase">
-              {{ currentUser.role === 'chief' ? '👑 Capo Lab' : '👤 Referente' }}
+    <!-- HEADER -->
+    <template v-else></template>
+      <header class="py-4 border-b border-[#30363d] flex items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-2 min-w-0 pr-1">
+          <span class="text-xl sm:text-2xl shrink-0">❄️</span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-bold text-white tracking-tight truncate">SnowFlake</h1>
+              <!-- Realtime Sync Badge Indicator -->
+              <span 
+                :class="[
+                  'text-[9px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all',
+                  syncStatus === 'live' ? 'bg-emerald-950 text-emerald-300 border-emerald-700' : 'bg-amber-950 text-amber-300 border-amber-700'
+                ]"
+                :title="syncStatus === 'live' ? 'Sincronizzazione cloud istantanea attiva per PC e smartphone' : 'Modalità memoria locale'"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="syncStatus === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
+                <span>{{ syncStatus === 'live' ? 'LIVE SYNC' : 'LOCAL' }}</span>
+              </span>
             </div>
+            <p class="text-[10px] sm:text-xs text-[#8b949e] truncate">Gestione Dipartimento & Laboratori</p>
           </div>
-          <span v-if="!isIdentityLocked" class="text-[10px] text-[#8b949e] transition-transform duration-200" :class="{ 'rotate-180': isIdentityDropdownOpen }">▼</span>
-        </button>
+        </div>
 
-        <!-- Custom Dropdown Menu -->
-        <div 
-          v-if="isIdentityDropdownOpen && !isIdentityLocked" 
-          class="absolute right-0 mt-1.5 w-56 sm:w-60 bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl py-1.5 z-50 text-xs overflow-hidden max-w-[85vw]"
-        >
-          <div class="px-3 py-1.5 text-[10px] font-bold text-[#8b949e] uppercase tracking-wider border-b border-[#30363d]">
-            Seleziona Utente Attivo
-          </div>
-          <button 
-            v-for="u in users" 
-            :key="u.id" 
-            @click="selectUser(u)" 
-            :class="[
-              'w-full px-3 py-2.5 text-left flex items-center justify-between transition hover:bg-[#21262d]',
-              u.id === currentUser.id ? 'bg-[#21262d] text-emerald-400 font-bold' : 'text-white'
-            ]"
-          >
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="text-sm shrink-0">{{ u.emoji }}</span>
-              <div class="truncate">
-                <div class="text-xs">{{ u.name }}</div>
-                <div class="text-[9px] opacity-70">{{ u.role === 'chief' ? '👑 Capo Lab' : 'Referente' }}</div>
+        <!-- Active User Identity Selector & Lock Controls -->
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto justify-end">
+          <div class="relative">
+            <button 
+              @click="isIdentityDropdownOpen = !isIdentityDropdownOpen"
+              :disabled="isIdentityLocked"
+              :class="[
+                'bg-[#161b22] text-white border text-xs rounded-lg px-2 sm:px-3 py-2 outline-none flex items-center gap-1.5 sm:gap-2 transition shadow-sm touch-target',
+                isIdentityLocked ? 'border-emerald-500/80 bg-emerald-950/30 text-emerald-300 font-bold opacity-100 cursor-not-allowed' : 'border-[#30363d] hover:border-emerald-500 cursor-pointer'
+              ]"
+              :title="isIdentityLocked ? 'Identità Bloccata (Sblocca per cambiare utente)' : 'Cambia Utente Attivo'"
+            >
+              <span class="text-base leading-none">{{ currentUser.emoji }}</span>
+              <div class="hidden sm:block text-left">
+                <div class="font-bold leading-tight">{{ currentUser.name }}</div>
               </div>
+              <span v-if="!isIdentityLocked" class="text-[10px] text-[#8b949e] transition-transform duration-200" :class="{ 'rotate-180': isIdentityDropdownOpen }">▼</span>
+            </button>
+
+            <!-- Custom Dropdown Menu -->
+            <div 
+              v-if="isIdentityDropdownOpen && !isIdentityLocked" 
+              class="absolute right-0 mt-1.5 w-56 sm:w-60 bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl py-1.5 z-50 text-xs overflow-hidden max-w-[85vw]"
+            >
+              <div class="px-3 py-1.5 text-[10px] font-bold text-[#8b949e] uppercase tracking-wider border-b border-[#30363d]">
+                Seleziona Utente Attivo
+              </div>
+              <button 
+                v-for="u in users" 
+                :key="u.id" 
+                @click="selectUser(u)" 
+                :class="[
+                  'w-full px-3 py-2.5 text-left flex items-center justify-between transition hover:bg-[#21262d]',
+                  u.id === currentUser.id ? 'bg-[#21262d] text-emerald-400 font-bold' : 'text-white'
+                ]"
+              >
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="text-sm shrink-0">{{ u.emoji }}</span>
+                  <div class="truncate">
+                    <div class="text-xs">{{ u.name }}</div>
+                  </div>
+                </div>
+                <span v-if="u.id === currentUser.id" class="text-xs shrink-0">✓</span>
+              </button>
             </div>
-            <span v-if="u.id === currentUser.id" class="text-xs shrink-0">✓</span>
+            
+            <!-- Backdrop -->
+            <div v-if="isIdentityDropdownOpen" @click="isIdentityDropdownOpen = false" class="fixed inset-0 z-40"></div>
+          </div>
+
+          <!-- Lock Toggle Button -->
+          <button 
+            @click="toggleIdentityLock"
+            :class="[
+              'px-2.5 sm:px-3 py-2 text-xs font-bold rounded-lg transition shrink-0 flex items-center gap-1.5 touch-target shadow-sm',
+              isIdentityLocked 
+                ? 'bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-600' 
+                : 'bg-amber-600 hover:bg-amber-500 text-white border border-amber-400 animate-pulse'
+            ]"
+            :title="isIdentityLocked ? 'Identità Bloccata - Azioni Abilitate' : 'Identità Sbloccata - Azioni Disabilitate'"
+          >
+            <span class="text-sm">{{ isIdentityLocked ? '🔒' : '🔓' }}</span>
+            <span class="hidden xs:inline sm:inline text-[11px]">
+              {{ isIdentityLocked ? 'Bloccato' : 'Sbloccato' }}
+            </span>
           </button>
         </div>
-        
-        <!-- Backdrop -->
-        <div v-if="isIdentityDropdownOpen" @click="isIdentityDropdownOpen = false" class="fixed inset-0 z-40"></div>
-      </div>
+      </header>
 
-      <!-- Lock Toggle Button -->
-      <button 
-        @click="toggleIdentityLock"
-        :class="[
-          'px-2.5 sm:px-3 py-2 text-xs font-bold rounded-lg transition shrink-0 flex items-center gap-1.5 touch-target shadow-sm',
-          isIdentityLocked 
-            ? 'bg-emerald-900/80 hover:bg-emerald-800 text-emerald-200 border border-emerald-600' 
-            : 'bg-amber-600 hover:bg-amber-500 text-white border border-amber-400 animate-pulse'
-        ]"
-        :title="isIdentityLocked ? 'Identità Bloccata - Azioni Abilitate' : 'Identità Sbloccata - Azioni Disabilitate'"
-      >
-        <span class="text-sm">{{ isIdentityLocked ? '🔒' : '🔓' }}</span>
-        <span class="hidden xs:inline sm:inline text-[11px]">
-          {{ isIdentityLocked ? 'Bloccato' : 'Sbloccato' }}
-        </span>
-      </button>
-    </div>
-  </header>
-
-  <!-- UNLOCKED IDENTITY WARNING BANNER -->
-  <div v-if="!isIdentityLocked" class="mt-3 bg-amber-950/60 border border-amber-700/80 text-amber-200 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 shadow-sm">
-    <div class="flex items-center gap-2 min-w-0">
-      <span class="text-base shrink-0">⚠️</span>
-      <p class="truncate sm:whitespace-normal">
-        <strong>Identità non bloccata!</strong> Per eseguire o gestire qualsiasi azione (analisi, scadenze, richieste), seleziona l'utente e clicca sul lucchetto 🔓.
-      </p>
-    </div>
-    <button @click="toggleIdentityLock" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-2.5 py-1 rounded text-[11px] shrink-0 transition">
-      🔒 Blocca Ora
-    </button>
-  </div>
-
-  <!-- NAVIGATION TABS -->
-  <nav class="flex overflow-x-auto no-scrollbar gap-2 py-3 border-b border-[#30363d] shrink-0 text-xs">
-    <button 
-      @click="activeTab = 'overview'"
-      :class="[
-        'px-3.5 py-2 rounded-lg border transition-all whitespace-nowrap shrink-0 flex items-center gap-2 touch-target font-semibold',
-        activeTab === 'overview' 
-          ? 'bg-[#21262d] text-white border-emerald-500 shadow-sm' 
-          : 'bg-[#161b22] text-[#8b949e] border-[#30363d] hover:text-white'
-      ]"
-    >
-      <span>📋</span>
-      <span>PANORAMICA</span>
-      <span class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/80 font-mono">
-        {{ globalAnalysisProgress.percent }}%
-      </span>
-    </button>
-
-    <div class="w-px h-6 bg-[#30363d] mx-1 self-center shrink-0"></div>
-
-    <button 
-      v-for="topic in topics" 
-      :key="topic.id"
-      @click="activeTab = topic.id"
-      :class="[
-        'px-3.5 py-2 rounded-lg border transition-all whitespace-nowrap shrink-0 flex items-center gap-2 touch-target font-semibold',
-        activeTab === topic.id 
-          ? 'bg-[#21262d] text-white border-emerald-500 shadow-sm' 
-          : 'bg-[#161b22] text-[#8b949e] border-[#30363d] hover:text-white'
-      ]"
-    >
-      <span>{{ topic.icon }}</span>
-      <span>{{ topic.name }}</span>
-      <span class="ml-0.5 text-[10px] px-1.5 py-0.2 rounded-full bg-[#0d1117] text-[#8b949e] border border-[#30363d] font-mono">
-        {{ getTopicAnalysisProgress(topic.id).percent }}%
-      </span>
-    </button>
-  </nav>
-
-  <!-- MAIN CONTENT CONTAINER -->
-  <main class="flex-1 py-4 space-y-6">
-
-    <!-- OVERVIEW TAB (Lab Chief Dashboard) -->
-    <section v-if="activeTab === 'overview'" class="space-y-5">
-      
-      <!-- Stats Widgets Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm flex justify-between items-center">
-          <div>
-            <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Acquisti In Attesa</div>
-            <div class="text-2xl font-bold text-white">{{ pendingPurchases.length }}</div>
-          </div>
-          <span class="text-2xl opacity-50">💳</span>
-        </div>
-        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm flex justify-between items-center">
-          <div>
-            <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Burocrazia In Attesa</div>
-            <div class="text-2xl font-bold text-white">{{ pendingBureaucracy.length }}</div>
-          </div>
-          <span class="text-2xl opacity-50">📄</span>
-        </div>
-        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm flex justify-between items-center">
-          <div>
-            <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Scadenze Imminenti (7gg)</div>
-            <div class="text-2xl font-bold text-emerald-400">{{ upcomingDeadlines.length }}</div>
-          </div>
-          <span class="text-2xl opacity-50">📅</span>
-        </div>
-      </div>
-
-      <!-- Chief Role Status Banner -->
-      <div v-if="currentUser.role !== 'chief'" class="bg-amber-950/30 border border-amber-800/50 text-amber-300 p-3.5 rounded-xl text-xs flex items-start gap-2.5">
+    <!-- UNLOCKED IDENTITY WARNING BANNER -->
+    <div v-if="!isIdentityLocked" class="mt-3 bg-amber-950/60 border border-amber-700/80 text-amber-200 px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-between gap-3 shadow-sm">
+      <div class="flex items-center gap-2 min-w-0">
         <span class="text-base shrink-0">⚠️</span>
-        <p class="leading-relaxed">
-          Stai visualizzando la panoramica generale. Solamente i <strong>3 Capi Lab</strong> (Dr. Head, Dr. Chief 2, Dr. Chief 3) hanno i permessi necessari per risolvere le richieste.
+        <p class="truncate sm:whitespace-normal">
+          <strong>Identità non bloccata!</strong> Per eseguire o gestire qualsiasi azione (analisi, scadenze, richieste), seleziona l'utente e clicca sul lucchetto 🔓.
         </p>
       </div>
+      <button @click="toggleIdentityLock" class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-2.5 py-1 rounded text-[11px] shrink-0 transition">
+        🔒 Blocca Ora
+      </button>
+    </div>
 
-      <!-- Pending Needs List (Grouped Dashboard) -->
-      <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm">
-        <div class="px-4 py-3 border-b border-[#30363d] flex items-center justify-between bg-[#0d1117]">
-          <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-            <span>📥</span> Richieste in Attesa di Risoluzione
-          </h2>
-          <span class="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 font-bold">LIVE STATUS</span>
-        </div>
+    <!-- NAVIGATION TABS -->
+    <nav class="flex overflow-x-auto no-scrollbar gap-2 py-3 border-b border-[#30363d] shrink-0 text-xs">
+      <button 
+        @click="activeTab = 'overview'"
+        :class="[
+          'px-3.5 py-2 rounded-lg border transition-all whitespace-nowrap shrink-0 flex items-center gap-2 touch-target font-semibold',
+          activeTab === 'overview' 
+            ? 'bg-[#21262d] text-white border-emerald-500 shadow-sm' 
+            : 'bg-[#161b22] text-[#8b949e] border-[#30363d] hover:text-white'
+        ]"
+      >
+        <span>📋</span>
+        <span>PANORAMICA</span>
+        <span class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/80 font-mono">
+          {{ globalAnalysisProgress.percent }}%
+        </span>
+      </button>
 
-        <div v-if="pendingNeeds.length === 0" class="p-8 text-center text-[#8b949e] text-xs">
-          <div class="text-3xl mb-2">✅</div>
-          <p>Tutto aggiornato! Nessuna richiesta in attesa nel laboratorio.</p>
-        </div>
+      <div class="w-px h-6 bg-[#30363d] mx-1 self-center shrink-0"></div>
 
-        <div v-else class="divide-y divide-[#30363d]">
-          <div v-for="need in pendingNeeds" :key="need.id" class="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#21262d]/50 transition">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-1">
-                <span :class="[
-                  'text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide border',
-                  need.type === 'purchase' ? 'bg-indigo-950 text-indigo-300 border-indigo-800' : 'bg-amber-950 text-amber-300 border-amber-800'
-                ]">
-                  {{ need.type === 'purchase' ? '💳 Acquisto' : '📄 Burocrazia' }}
-                </span>
-                <span class="text-[10px] text-[#8b949e] bg-[#0d1117] px-2 py-0.5 rounded border border-[#30363d]">
-                  {{ getTopicName(need.topicId) }}
-                </span>
-              </div>
-              <h3 class="text-xs sm:text-sm font-bold text-white mb-0.5">{{ need.title }}</h3>
-              <div class="text-[11px] sm:text-xs text-[#8b949e] flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span>Richiesto da: <strong class="text-white">{{ getUserName(need.createdBy) }}</strong></span>
-                <span v-if="need.details" class="truncate max-w-[250px] sm:max-w-md">• {{ need.details }}</span>
-              </div>
-            </div>
+      <button 
+        v-for="topic in topics" 
+        :key="topic.id"
+        @click="activeTab = topic.id"
+        :class="[
+          'px-3.5 py-2 rounded-lg border transition-all whitespace-nowrap shrink-0 flex items-center gap-2 touch-target font-semibold',
+          activeTab === topic.id 
+            ? 'bg-[#21262d] text-white border-emerald-500 shadow-sm' 
+            : 'bg-[#161b22] text-[#8b949e] border-[#30363d] hover:text-white'
+        ]"
+      >
+        <span>{{ topic.icon }}</span>
+        <span>{{ topic.name }}</span>
+        <span class="ml-0.5 text-[10px] px-1.5 py-0.2 rounded-full bg-[#0d1117] text-[#8b949e] border border-[#30363d] font-mono">
+          {{ getTopicAnalysisProgress(topic.id).percent }}%
+        </span>
+      </button>
+    </nav>
 
-            <!-- Action Button for Chiefs Only -->
-            <div class="shrink-0 flex items-center">
-              <button 
-                v-if="currentUser.role === 'chief'"
-                @click="resolveNeed(need.id)"
-                :disabled="!isIdentityLocked"
-                :class="[
-                  'w-full sm:w-auto px-3 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 touch-target border',
-                  isIdentityLocked 
-                    ? 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border-emerald-700 cursor-pointer' 
-                    : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-60'
-                ]"
-              >
-                <span>{{ isIdentityLocked ? '✓' : '🔒' }}</span>
-                <span>Risolvi</span>
-              </button>
-              <div v-else class="text-[11px] text-[#8b949e] italic">
-                Riservato ai Capi Lab
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-1 py-4 space-y-6">
 
-      <!-- SECTION ANALYSES PROGRESS TRACKER CARD -->
-      <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#30363d] pb-3">
-          <div>
-            <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-              <span>📊</span> Avanzamento Delle Analisi
-            </h2>
-            <p class="text-[11px] text-[#8b949e]">Tracciamento delle analisi di laboratorio condotte in ciascun gruppo</p>
-          </div>
-          <div class="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded border border-emerald-800 shrink-0 self-start sm:self-auto">
-            Totale: {{ globalAnalysisProgress.completed }} / {{ globalAnalysisProgress.total }} Completate ({{ globalAnalysisProgress.percent }}%)
-          </div>
-        </div>
-
-        <!-- Grid of Topic Analysis Progresses -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          <div 
-            v-for="topic in topics" 
-            :key="'ov-prog-'+topic.id" 
-            @click="activeTab = topic.id"
-            class="bg-[#0d1117] border border-[#30363d] hover:border-emerald-500/50 rounded-lg p-3.5 transition cursor-pointer space-y-2.5 group"
-          >
-            <div class="flex items-center justify-between text-xs">
-              <span class="font-bold text-white group-hover:text-emerald-400 transition flex items-center gap-1.5">
-                <span>{{ topic.icon }}</span> {{ topic.name }}
-              </span>
-              <span class="font-mono text-emerald-400 font-bold text-[11px]">
-                {{ getTopicAnalysisProgress(topic.id).completed }} / {{ getTopicAnalysisProgress(topic.id).total }} Completate ({{ getTopicAnalysisProgress(topic.id).percent }}%)
-              </span>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="w-full bg-[#161b22] rounded-full h-2 overflow-hidden border border-[#30363d] p-0.5">
-              <div 
-                class="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-full transition-all duration-500" 
-                :style="{ width: getTopicAnalysisProgress(topic.id).percent + '%' }"
-              ></div>
-            </div>
-
-            <div class="flex justify-between items-center text-[10px] text-[#8b949e] pt-0.5">
-              <span>Referenti: {{ topic.refs.map(r => getUserName(r)).join(', ') }}</span>
-              <span class="text-emerald-400 font-semibold group-hover:underline">Vai alla pagina →</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- TOPIC TABS -->
-    <section v-for="topic in topics" :key="'sec-'+topic.id" v-show="activeTab === topic.id" class="space-y-4">
-      
-      <!-- Topic Header Banner -->
-      <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-        <div>
-          <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-            <span>{{ topic.icon }}</span> {{ topic.name }}
-          </h2>
-          <p class="text-xs text-[#8b949e] mt-0.5">Sezione Operativa e Attività</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-[#8b949e] shrink-0">Referenti:</span>
-          <div class="flex flex-wrap gap-1">
-             <div v-for="refId in topic.refs" :key="refId" class="flex items-center gap-1 bg-[#0d1117] border border-[#30363d] px-2 py-0.5 rounded text-xs text-white">
-                <span>{{ getUserEmoji(refId) }}</span>
-                <span>{{ getUserName(refId) }}</span>
-             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- PAGE PROGRESS TRACKER BAR FOR THIS TOPIC -->
-      <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-3.5 sm:p-4 shadow-sm space-y-2">
-        <div class="flex items-center justify-between text-xs">
-          <div class="flex items-center gap-2 font-bold text-white">
-            <span>🧪</span>
-            <span>Avanzamento Analisi & Esperimenti - {{ topic.name }}</span>
-          </div>
-          <span class="font-bold text-emerald-400 font-mono text-xs sm:text-sm">
-            {{ getTopicAnalysisProgress(topic.id).completed }} / {{ getTopicAnalysisProgress(topic.id).total }} Completate ({{ getTopicAnalysisProgress(topic.id).percent }}%)
-          </span>
-        </div>
+      <!-- OVERVIEW TAB (Lab Chief Dashboard) -->
+      <section v-if="activeTab === 'overview'" class="space-y-5">
         
-        <!-- Topic Progress Bar -->
-        <div class="w-full bg-[#0d1117] rounded-full h-2.5 overflow-hidden border border-[#30363d] p-0.5">
-          <div 
-            class="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-full transition-all duration-500" 
-            :style="{ width: getTopicAnalysisProgress(topic.id).percent + '%' }"
-          ></div>
-        </div>
-
-        <div class="flex justify-between items-center text-[10px] text-[#8b949e]">
-          <span>Completamento delle analisi programmate per questo laboratorio</span>
-          <span>Analisi In Corso: {{ getAnalysesByTopic(topic.id).length - getTopicAnalysisProgress(topic.id).completed }}</span>
-        </div>
-      </div>
-
-      <!-- Access Control Alert -->
-      <div v-if="!canManageTopic(topic)" class="bg-[#161b22] border border-[#30363d] text-[#8b949e] p-3 rounded-xl text-xs flex items-center gap-2">
-        <span>🔒</span>
-        <span>Modalità Sola Lettura: Puoi aggiungere o modificare le attività di questa sezione solo se sei assegnato come <strong>Referente</strong> di questa materia o come <strong>Capo Lab</strong>.</span>
-      </div>
-
-      <!-- ANALYSES TO CONDUCT -->
-      <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm flex flex-col">
-        <div class="px-4 py-3 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between">
-          <h3 class="text-xs font-bold text-white flex items-center gap-2">
-            <span>🧬</span> ANALISI & ESPERIMENTI IN CORSO
-          </h3>
-          <span class="text-[10px] text-[#8b949e] font-mono">
-            {{ getTopicAnalysisProgress(topic.id).completed }} di {{ getAnalysesByTopic(topic.id).length }} Completate
-          </span>
-        </div>
-
-        <!-- Add Analysis Form -->
-        <div v-if="canManageTopic(topic)" class="p-3 border-b border-[#30363d] bg-[#0d1117]/50 space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">REGISTRA NUOVA ANALISI DA CONDURRE</span>
-            <span v-if="!isIdentityLocked" class="text-[10px] text-amber-400 font-bold">🔒 Blocco identità richiesto</span>
+        <!-- Stats Widgets Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm flex justify-between items-center">
+            <div>
+              <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Acquisti In Attesa</div>
+              <div class="text-2xl font-bold text-white">{{ pendingPurchases.length }}</div>
+            </div>
+            <span class="text-2xl opacity-50">💳</span>
           </div>
-
-          <div class="flex flex-col sm:flex-row gap-2">
-            <input 
-              v-model="newAnalysis.title" 
-              type="text" 
-              :disabled="!isIdentityLocked"
-              placeholder="Titolo dell'analisi (Es. Sequenziamento RNA-seq, Taratura laser)..." 
-              class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-            <input 
-              v-model="newAnalysis.details" 
-              type="text" 
-              :disabled="!isIdentityLocked"
-              placeholder="Dettagli / Protocollo / Campioni..." 
-              class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-            <button 
-              @click="addAnalysis(topic.id)" 
-              :disabled="!isIdentityLocked"
-              :class="[
-                'px-3.5 py-2 rounded-lg text-xs font-bold transition shrink-0 touch-target flex items-center justify-center gap-1 border',
-                isIdentityLocked 
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 cursor-pointer' 
-                  : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-60'
-              ]"
-            >
-              <span>{{ isIdentityLocked ? '+' : '🔒' }}</span>
-              <span>Aggiungi</span>
-            </button>
+          <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm flex justify-between items-center">
+            <div>
+              <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Burocrazia In Attesa</div>
+              <div class="text-2xl font-bold text-white">{{ pendingBureaucracy.length }}</div>
+            </div>
+            <span class="text-2xl opacity-50">📄</span>
+          </div>
+          <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm flex justify-between items-center">
+            <div>
+              <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Scadenze Imminenti (7gg)</div>
+              <div class="text-2xl font-bold text-emerald-400">{{ upcomingDeadlines.length }}</div>
+            </div>
+            <span class="text-2xl opacity-50">📅</span>
           </div>
         </div>
 
-        <!-- List of Analyses -->
-        <div class="p-3 divide-y divide-[#30363d]/50 space-y-2">
-          <div v-if="getAnalysesByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
-            Nessuna analisi registrata per questa sezione. Aggiungi le analisi da condurre per aggiornare la barra di progresso!
+        <!-- Chief Role Status Banner -->
+        <div v-if="currentUser.role !== 'chief'" class="bg-amber-950/30 border border-amber-800/50 text-amber-300 p-3.5 rounded-xl text-xs flex items-start gap-2.5">
+          <span class="text-base shrink-0">⚠️</span>
+          <p class="leading-relaxed">
+            Stai visualizzando la panoramica generale. Solamente i <strong>3 Capi Lab</strong> (Dr. Head, Dr. Chief 2, Dr. Chief 3) hanno i permessi necessari per risolvere le richieste.
+          </p>
+        </div>
+
+        <!-- Pending Needs List (Grouped Dashboard) -->
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm">
+          <div class="px-4 py-3 border-b border-[#30363d] flex items-center justify-between bg-[#0d1117]">
+            <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+              <span>📥</span> Richieste in Attesa di Risoluzione
+            </h2>
+            <span class="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 font-bold">LIVE STATUS</span>
           </div>
 
-          <div 
-            v-for="item in getAnalysesByTopic(topic.id)" 
-            :key="item.id"
-            :class="[
-              'pt-2 pb-1 flex items-start justify-between gap-3 transition rounded-lg p-2.5',
-              item.completed ? 'bg-emerald-950/20 border border-emerald-900/30' : 'bg-[#0d1117] border border-[#30363d]'
-            ]"
-          >
-            <div class="flex items-start gap-2.5 min-w-0 flex-1">
-              <!-- Toggle Checkbox Button -->
-              <button 
-                @click="toggleAnalysis(item.id)"
-                :disabled="!isIdentityLocked || !canManageTopic(topic)"
-                :class="[
-                  'mt-0.5 w-5 h-5 rounded flex items-center justify-center shrink-0 border transition',
-                  item.completed 
-                    ? 'bg-emerald-500 border-emerald-400 text-black font-bold' 
-                    : 'border-[#30363d] bg-[#161b22] hover:border-emerald-500',
-                  (!isIdentityLocked || !canManageTopic(topic)) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                ]"
-                :title="!isIdentityLocked ? 'Blocca identità per modificare lo stato' : 'Segna come completata'"
-              >
-                <span v-if="item.completed" class="text-xs">✓</span>
-              </button>
+          <div v-if="pendingNeeds.length === 0" class="p-8 text-center text-[#8b949e] text-xs">
+            <div class="text-3xl mb-2">✅</div>
+            <p>Tutto aggiornato! Nessuna richiesta in attesa nel laboratorio.</p>
+          </div>
 
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2">
-                  <h4 :class="['text-xs font-bold', item.completed ? 'text-[#8b949e] line-through' : 'text-white']">
-                    {{ item.title }}
-                  </h4>
+          <div v-else class="divide-y divide-[#30363d]">
+            <div v-for="need in pendingNeeds" :key="need.id" class="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#21262d]/50 transition">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
                   <span :class="[
-                    'text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase',
-                    item.completed ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-amber-950 text-amber-300 border-amber-800'
+                    'text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide border',
+                    need.type === 'purchase' ? 'bg-indigo-950 text-indigo-300 border-indigo-800' : 'bg-amber-950 text-amber-300 border-amber-800'
                   ]">
-                    {{ item.completed ? 'Completata' : 'In Corso' }}
+                    {{ need.type === 'purchase' ? '💳 Acquisto' : '📄 Burocrazia' }}
+                  </span>
+                  <span class="text-[10px] text-[#8b949e] bg-[#0d1117] px-2 py-0.5 rounded border border-[#30363d]">
+                    {{ getTopicName(need.topicId) }}
                   </span>
                 </div>
-                <p v-if="item.details" class="text-[11px] text-[#8b949e] mt-0.5">{{ item.details }}</p>
-                <div class="text-[9px] text-[#8b949e] mt-1">Registrato da {{ getUserName(item.createdBy) }}</div>
+                <h3 class="text-xs sm:text-sm font-bold text-white mb-0.5">{{ need.title }}</h3>
+                <div class="text-[11px] sm:text-xs text-[#8b949e] flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>Richiesto da: <strong class="text-white">{{ getUserName(need.createdBy) }}</strong></span>
+                  <span v-if="need.details" class="truncate max-w-[250px] sm:max-w-md">• {{ need.details }}</span>
+                </div>
+              </div>
+
+              <!-- Action Button for Chiefs Only -->
+              <div class="shrink-0 flex items-center">
+                <button 
+                  v-if="currentUser.role === 'chief'"
+                  @click="resolveNeed(need.id)"
+                  :disabled="!isIdentityLocked"
+                  :class="[
+                    'w-full sm:w-auto px-3 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 touch-target border',
+                    isIdentityLocked 
+                      ? 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border-emerald-700 cursor-pointer' 
+                      : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-60'
+                  ]"
+                >
+                  <span>{{ isIdentityLocked ? '✓' : '🔒' }}</span>
+                  <span>Risolvi</span>
+                </button>
+                <div v-else class="text-[11px] text-[#8b949e] italic">
+                  Riservato ai Capi Lab
+                </div>
               </div>
             </div>
-
-            <button 
-              v-if="canManageTopic(topic)" 
-              @click="deleteAnalysis(item.id)" 
-              :disabled="!isIdentityLocked"
-              :class="[
-                'text-[10px] px-1.5 py-0.5 transition shrink-0',
-                isIdentityLocked ? 'text-[#8b949e] hover:text-red-400 cursor-pointer' : 'text-gray-600 cursor-not-allowed opacity-40'
-              ]"
-            >
-              ✕
-            </button>
           </div>
         </div>
-      </div>
 
-      <!-- Two Column Layout for Activities & Requests -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- SECTION ANALYSES PROGRESS TRACKER CARD -->
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#30363d] pb-3">
+            <div>
+              <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                <span>📊</span> Avanzamento Delle Analisi
+              </h2>
+              <p class="text-[11px] text-[#8b949e]">Tracciamento delle analisi di laboratorio condotte in ciascun gruppo</p>
+            </div>
+            <div class="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded border border-emerald-800 shrink-0 self-start sm:self-auto">
+              Totale: {{ globalAnalysisProgress.completed }} / {{ globalAnalysisProgress.total }} Completate ({{ globalAnalysisProgress.percent }}%)
+            </div>
+          </div>
+
+          <!-- Grid of Topic Analysis Progresses -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <div 
+              v-for="topic in topics" 
+              :key="'ov-prog-'+topic.id" 
+              @click="activeTab = topic.id"
+              class="bg-[#0d1117] border border-[#30363d] hover:border-emerald-500/50 rounded-lg p-3.5 transition cursor-pointer space-y-2.5 group"
+            >
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-bold text-white group-hover:text-emerald-400 transition flex items-center gap-1.5">
+                  <span>{{ topic.icon }}</span> {{ topic.name }}
+                </span>
+                <span class="font-mono text-emerald-400 font-bold text-[11px]">
+                  {{ getTopicAnalysisProgress(topic.id).completed }} / {{ getTopicAnalysisProgress(topic.id).total }} Completate ({{ getTopicAnalysisProgress(topic.id).percent }}%)
+                </span>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="w-full bg-[#161b22] rounded-full h-2 overflow-hidden border border-[#30363d] p-0.5">
+                <div 
+                  class="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-full transition-all duration-500" 
+                  :style="{ width: getTopicAnalysisProgress(topic.id).percent + '%' }"
+                ></div>
+              </div>
+
+              <div class="flex justify-between items-center text-[10px] text-[#8b949e] pt-0.5">
+                <span>Referenti: {{ topic.refs.map(r => getUserName(r)).join(', ') }}</span>
+                <span class="text-emerald-400 font-semibold group-hover:underline">Vai alla pagina →</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TOPIC TABS -->
+      <section v-for="topic in topics" :key="'sec-'+topic.id" v-show="activeTab === topic.id" class="space-y-4">
         
-        <!-- LEFT COLUMN: Deadlines -->
+        <!-- Topic Header Banner -->
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span>{{ topic.icon }}</span> {{ topic.name }}
+            </h2>
+            <p class="text-xs text-[#8b949e] mt-0.5">Sezione Operativa e Attività</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-[#8b949e] shrink-0">Referenti:</span>
+            <div class="flex flex-wrap gap-1">
+              <div v-for="refId in topic.refs" :key="refId" class="flex items-center gap-1 bg-[#0d1117] border border-[#30363d] px-2 py-0.5 rounded text-xs text-white">
+                  <span>{{ getUserEmoji(refId) }}</span>
+                  <span>{{ getUserName(refId) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE PROGRESS TRACKER BAR FOR THIS TOPIC -->
+        <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-3.5 sm:p-4 shadow-sm space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span>🧪</span>
+              <span>Avanzamento Analisi & Esperimenti - {{ topic.name }}</span>
+            </div>
+            <span class="font-bold text-emerald-400 font-mono text-xs sm:text-sm">
+              {{ getTopicAnalysisProgress(topic.id).completed }} / {{ getTopicAnalysisProgress(topic.id).total }} Completate ({{ getTopicAnalysisProgress(topic.id).percent }}%)
+            </span>
+          </div>
+          
+          <!-- Topic Progress Bar -->
+          <div class="w-full bg-[#0d1117] rounded-full h-2.5 overflow-hidden border border-[#30363d] p-0.5">
+            <div 
+              class="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-full transition-all duration-500" 
+              :style="{ width: getTopicAnalysisProgress(topic.id).percent + '%' }"
+            ></div>
+          </div>
+
+          <div class="flex justify-between items-center text-[10px] text-[#8b949e]">
+            <span>Completamento delle analisi programmate per questo laboratorio</span>
+            <span>Analisi In Corso: {{ getAnalysesByTopic(topic.id).length - getTopicAnalysisProgress(topic.id).completed }}</span>
+          </div>
+        </div>
+
+        <!-- Access Control Alert -->
+        <div v-if="!canManageTopic(topic)" class="bg-[#161b22] border border-[#30363d] text-[#8b949e] p-3 rounded-xl text-xs flex items-center gap-2">
+          <span>🔒</span>
+          <span>Modalità Sola Lettura: Puoi aggiungere o modificare le attività di questa sezione solo se sei assegnato come <strong>Referente</strong> di questa materia o come <strong>Capo Lab</strong>.</span>
+        </div>
+
+        <!-- ANALYSES TO CONDUCT -->
         <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm flex flex-col">
           <div class="px-4 py-3 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between">
             <h3 class="text-xs font-bold text-white flex items-center gap-2">
-              <span>📅</span> ATTIVITÀ & SCADENZE
+              <span>🧬</span> ANALISI & ESPERIMENTI IN CORSO
             </h3>
-            <span class="text-[10px] text-[#8b949e] font-mono">{{ getDeadlinesByTopic(topic.id).length }} elementi</span>
+            <span class="text-[10px] text-[#8b949e] font-mono">
+              {{ getTopicAnalysisProgress(topic.id).completed }} di {{ getAnalysesByTopic(topic.id).length }} Completate
+            </span>
           </div>
 
-          <!-- Add Deadline Form -->
+          <!-- Add Analysis Form -->
           <div v-if="canManageTopic(topic)" class="p-3 border-b border-[#30363d] bg-[#0d1117]/50 space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">NUOVA SCADENZA</span>
+              <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">REGISTRA NUOVA ANALISI DA CONDURRE</span>
               <span v-if="!isIdentityLocked" class="text-[10px] text-amber-400 font-bold">🔒 Blocco identità richiesto</span>
             </div>
-            
+
             <div class="flex flex-col sm:flex-row gap-2">
               <input 
-                v-model="newDeadline.title" 
+                v-model="newAnalysis.title" 
                 type="text" 
                 :disabled="!isIdentityLocked"
-                placeholder="Es. Preparazione campioni..." 
+                placeholder="Titolo dell'analisi (Es. Sequenziamento RNA-seq, Taratura laser)..." 
                 class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
               <input 
-                v-model="newDeadline.date" 
-                type="date" 
+                v-model="newAnalysis.details" 
+                type="text" 
                 :disabled="!isIdentityLocked"
-                class="w-full sm:w-36 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder="Dettagli / Protocollo / Campioni..." 
+                class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
               <button 
-                @click="addDeadline(topic.id)" 
+                @click="addAnalysis(topic.id)" 
                 :disabled="!isIdentityLocked"
                 :class="[
-                  'px-3 py-2 rounded-lg text-xs font-bold transition shrink-0 touch-target flex items-center justify-center gap-1 border',
+                  'px-3.5 py-2 rounded-lg text-xs font-bold transition shrink-0 touch-target flex items-center justify-center gap-1 border',
                   isIdentityLocked 
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 cursor-pointer' 
                     : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-60'
@@ -588,177 +526,289 @@
             </div>
           </div>
 
-          <!-- List of Deadlines -->
-          <div class="p-2 flex-1 overflow-y-auto min-h-[180px]">
-            <div v-if="getDeadlinesByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
-              Nessuna scadenza in programma.
+          <!-- List of Analyses -->
+          <div class="p-3 divide-y divide-[#30363d]/50 space-y-2">
+            <div v-if="getAnalysesByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
+              Nessuna analisi registrata per questa sezione. Aggiungi le analisi da condurre per aggiornare la barra di progresso!
             </div>
-            <div class="space-y-1.5">
-              <div v-for="dl in getDeadlinesByTopic(topic.id)" :key="dl.id" class="p-2.5 bg-[#0d1117] border border-[#30363d] rounded-lg flex items-center justify-between">
-                <div class="min-w-0 pr-2">
-                  <div class="text-xs font-bold text-white mb-0.5 truncate">{{ dl.title }}</div>
-                  <div class="text-[10px] text-[#8b949e] flex flex-wrap items-center gap-1.5">
-                    <span class="text-emerald-400">📅 {{ formatDate(dl.date) }}</span>
-                    <span>•</span>
-                    <span>da {{ getUserName(dl.createdBy) }}</span>
-                  </div>
-                </div>
-                
+
+            <div 
+              v-for="item in getAnalysesByTopic(topic.id)" 
+              :key="item.id"
+              :class="[
+                'pt-2 pb-1 flex items-start justify-between gap-3 transition rounded-lg p-2.5',
+                item.completed ? 'bg-emerald-950/20 border border-emerald-900/30' : 'bg-[#0d1117] border border-[#30363d]'
+              ]"
+            >
+              <div class="flex items-start gap-2.5 min-w-0 flex-1">
+                <!-- Toggle Checkbox Button -->
                 <button 
-                  v-if="canManageTopic(topic)" 
-                  @click="deleteDeadline(dl.id)" 
-                  :disabled="!isIdentityLocked"
+                  @click="toggleAnalysis(item.id)"
+                  :disabled="!isIdentityLocked || !canManageTopic(topic)"
                   :class="[
-                    'transition px-2 text-xs touch-target flex items-center justify-center',
-                    isIdentityLocked ? 'text-[#8b949e] hover:text-red-400 cursor-pointer' : 'text-gray-600 cursor-not-allowed opacity-40'
+                    'mt-0.5 w-5 h-5 rounded flex items-center justify-center shrink-0 border transition',
+                    item.completed 
+                      ? 'bg-emerald-500 border-emerald-400 text-black font-bold' 
+                      : 'border-[#30363d] bg-[#161b22] hover:border-emerald-500',
+                    (!isIdentityLocked || !canManageTopic(topic)) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                   ]"
+                  :title="!isIdentityLocked ? 'Blocca identità per modificare lo stato' : 'Segna come completata'"
                 >
-                  ✕
+                  <span v-if="item.completed" class="text-xs">✓</span>
                 </button>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <h4 :class="['text-xs font-bold', item.completed ? 'text-[#8b949e] line-through' : 'text-white']">
+                      {{ item.title }}
+                    </h4>
+                    <span :class="[
+                      'text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase',
+                      item.completed ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-amber-950 text-amber-300 border-amber-800'
+                    ]">
+                      {{ item.completed ? 'Completata' : 'In Corso' }}
+                    </span>
+                  </div>
+                  <p v-if="item.details" class="text-[11px] text-[#8b949e] mt-0.5">{{ item.details }}</p>
+                  <div class="text-[9px] text-[#8b949e] mt-1">Registrato da {{ getUserName(item.createdBy) }}</div>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- RIGHT COLUMN: Purchase Requests & Bureaucracy -->
-        <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm flex flex-col">
-          <div class="px-4 py-3 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between">
-            <h3 class="text-xs font-bold text-white flex items-center gap-2">
-              <span>🛒</span> RICHIESTE ACQUISTI & BUROCRAZIA
-            </h3>
-            <span class="text-[10px] text-[#8b949e] font-mono">{{ getNeedsByTopic(topic.id).length }} elementi</span>
-          </div>
-
-          <!-- Add Request Form -->
-          <div v-if="canManageTopic(topic)" class="p-3 border-b border-[#30363d] bg-[#0d1117]/50 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wide">INVIA RICHIESTA AL CAPO LAB</span>
-              <span v-if="!isIdentityLocked" class="text-[10px] text-amber-400 font-bold">🔒 Blocco identità richiesto</span>
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-2">
-              <select 
-                v-model="newNeed.type" 
-                :disabled="!isIdentityLocked"
-                class="w-full sm:w-32 bg-[#0d1117] border border-[#30363d] rounded-lg px-2 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-              >
-                <option value="purchase">Acquisto</option>
-                <option value="admin">Burocrazia</option>
-              </select>
-              <input 
-                v-model="newNeed.title" 
-                type="text" 
-                :disabled="!isIdentityLocked"
-                placeholder="Titolo della richiesta..." 
-                class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-            </div>
-            
-            <div class="flex flex-col sm:flex-row gap-2">
-              <input 
-                v-model="newNeed.details" 
-                type="text" 
-                :disabled="!isIdentityLocked"
-                placeholder="Dettagli (Fornitore, Link, Urgenza)..." 
-                class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-              >
               <button 
-                @click="addNeed(topic.id)" 
+                v-if="canManageTopic(topic)" 
+                @click="deleteAnalysis(item.id)" 
                 :disabled="!isIdentityLocked"
                 :class="[
-                  'px-3 py-2 rounded-lg text-xs font-bold transition shrink-0 touch-target flex items-center justify-center gap-1 border',
-                  isIdentityLocked 
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500 cursor-pointer' 
-                    : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-60'
+                  'text-[10px] px-1.5 py-0.5 transition shrink-0',
+                  isIdentityLocked ? 'text-[#8b949e] hover:text-red-400 cursor-pointer' : 'text-gray-600 cursor-not-allowed opacity-40'
                 ]"
               >
-                <span>{{ isIdentityLocked ? '🚀' : '🔒' }}</span>
-                <span>Invia</span>
+                ✕
               </button>
             </div>
           </div>
+        </div>
 
-          <!-- List of Needs -->
-          <div class="p-2 flex-1 overflow-y-auto min-h-[180px]">
-            <div v-if="getNeedsByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
-              Nessuna richiesta attiva per questa sezione.
+        <!-- Two Column Layout for Activities & Requests -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          <!-- LEFT COLUMN: Deadlines -->
+          <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm flex flex-col">
+            <div class="px-4 py-3 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between">
+              <h3 class="text-xs font-bold text-white flex items-center gap-2">
+                <span>📅</span> ATTIVITÀ & SCADENZE
+              </h3>
+              <span class="text-[10px] text-[#8b949e] font-mono">{{ getDeadlinesByTopic(topic.id).length }} elementi</span>
             </div>
-            <div class="space-y-1.5">
-              <div 
-                v-for="need in getNeedsByTopic(topic.id)" 
-                :key="need.id" 
-                :class="[
-                  'p-2.5 border rounded-lg transition', 
-                  need.status === 'resolved' ? 'bg-emerald-950/20 border-emerald-900/40 opacity-70' : 'bg-[#0d1117] border-[#30363d]'
-                ]"
-              >
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-1.5 mb-1">
-                      <span v-if="need.status === 'resolved'" class="text-[9px] bg-emerald-950 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-800 uppercase font-bold">✓ Risolto</span>
-                      <span v-else :class="['text-[9px] font-bold px-1.5 py-0.2 rounded uppercase border', need.type === 'purchase' ? 'bg-indigo-950 text-indigo-300 border-indigo-800' : 'bg-amber-950 text-amber-300 border-amber-800']">
-                        {{ need.type === 'purchase' ? 'Acquisto' : 'Burocrazia' }}
-                      </span>
-                      <span class="text-[9px] text-[#8b949e]">da {{ getUserName(need.createdBy) }}</span>
+
+            <!-- Add Deadline Form -->
+            <div v-if="canManageTopic(topic)" class="p-3 border-b border-[#30363d] bg-[#0d1117]/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">NUOVA SCADENZA</span>
+                <span v-if="!isIdentityLocked" class="text-[10px] text-amber-400 font-bold">🔒 Blocco identità richiesto</span>
+              </div>
+              
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input 
+                  v-model="newDeadline.title" 
+                  type="text" 
+                  :disabled="!isIdentityLocked"
+                  placeholder="Es. Preparazione campioni..." 
+                  class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                <input 
+                  v-model="newDeadline.date" 
+                  type="date" 
+                  :disabled="!isIdentityLocked"
+                  class="w-full sm:w-36 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                <button 
+                  @click="addDeadline(topic.id)" 
+                  :disabled="!isIdentityLocked"
+                  :class="[
+                    'px-3 py-2 rounded-lg text-xs font-bold transition shrink-0 touch-target flex items-center justify-center gap-1 border',
+                    isIdentityLocked 
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 cursor-pointer' 
+                      : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-60'
+                  ]"
+                >
+                  <span>{{ isIdentityLocked ? '+' : '🔒' }}</span>
+                  <span>Aggiungi</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- List of Deadlines -->
+            <div class="p-2 flex-1 overflow-y-auto min-h-[180px]">
+              <div v-if="getDeadlinesByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
+                Nessuna scadenza in programma.
+              </div>
+              <div class="space-y-1.5">
+                <div v-for="dl in getDeadlinesByTopic(topic.id)" :key="dl.id" class="p-2.5 bg-[#0d1117] border border-[#30363d] rounded-lg flex items-center justify-between">
+                  <div class="min-w-0 pr-2">
+                    <div class="text-xs font-bold text-white mb-0.5 truncate">{{ dl.title }}</div>
+                    <div class="text-[10px] text-[#8b949e] flex flex-wrap items-center gap-1.5">
+                      <span class="text-emerald-400">📅 {{ formatDate(dl.date) }}</span>
+                      <span>•</span>
+                      <span>da {{ getUserName(dl.createdBy) }}</span>
                     </div>
-                    <div :class="['text-xs font-bold mb-0.5', need.status === 'resolved' ? 'text-[#8b949e] line-through' : 'text-white']">{{ need.title }}</div>
-                    <div v-if="need.details" class="text-[11px] text-[#8b949e] truncate">{{ need.details }}</div>
                   </div>
                   
-                  <div v-if="canManageTopic(topic)" class="flex flex-col items-end gap-1 shrink-0">
-                    <button 
-                      v-if="currentUser.role === 'chief' && need.status === 'pending'" 
-                      @click="resolveNeed(need.id)" 
-                      :disabled="!isIdentityLocked"
-                      :class="[
-                        'text-[9px] px-2 py-1 rounded border font-bold transition flex items-center gap-1',
-                        isIdentityLocked 
-                          ? 'bg-emerald-950 text-emerald-300 border-emerald-700 hover:bg-emerald-900 cursor-pointer' 
-                          : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-50'
-                      ]"
-                    >
-                      <span>{{ isIdentityLocked ? '✓' : '🔒' }}</span>
-                      <span>Risolvi</span>
-                    </button>
+                  <button 
+                    v-if="canManageTopic(topic)" 
+                    @click="deleteDeadline(dl.id)" 
+                    :disabled="!isIdentityLocked"
+                    :class="[
+                      'transition px-2 text-xs touch-target flex items-center justify-center',
+                      isIdentityLocked ? 'text-[#8b949e] hover:text-red-400 cursor-pointer' : 'text-gray-600 cursor-not-allowed opacity-40'
+                    ]"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: Purchase Requests & Bureaucracy -->
+          <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm flex flex-col">
+            <div class="px-4 py-3 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between">
+              <h3 class="text-xs font-bold text-white flex items-center gap-2">
+                <span>🛒</span> RICHIESTE ACQUISTI & BUROCRAZIA
+              </h3>
+              <span class="text-[10px] text-[#8b949e] font-mono">{{ getNeedsByTopic(topic.id).length }} elementi</span>
+            </div>
+
+            <!-- Add Request Form -->
+            <div v-if="canManageTopic(topic)" class="p-3 border-b border-[#30363d] bg-[#0d1117]/50 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wide">INVIA RICHIESTA AL CAPO LAB</span>
+                <span v-if="!isIdentityLocked" class="text-[10px] text-amber-400 font-bold">🔒 Blocco identità richiesto</span>
+              </div>
+
+              <div class="flex flex-col sm:flex-row gap-2">
+                <select 
+                  v-model="newNeed.type" 
+                  :disabled="!isIdentityLocked"
+                  class="w-full sm:w-32 bg-[#0d1117] border border-[#30363d] rounded-lg px-2 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                >
+                  <option value="purchase">Acquisto</option>
+                  <option value="admin">Burocrazia</option>
+                </select>
+                <input 
+                  v-model="newNeed.title" 
+                  type="text" 
+                  :disabled="!isIdentityLocked"
+                  placeholder="Titolo della richiesta..." 
+                  class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+              </div>
+              
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input 
+                  v-model="newNeed.details" 
+                  type="text" 
+                  :disabled="!isIdentityLocked"
+                  placeholder="Dettagli (Fornitore, Link, Urgenza)..." 
+                  class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                <button 
+                  @click="addNeed(topic.id)" 
+                  :disabled="!isIdentityLocked"
+                  :class="[
+                    'px-3 py-2 rounded-lg text-xs font-bold transition shrink-0 touch-target flex items-center justify-center gap-1 border',
+                    isIdentityLocked 
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500 cursor-pointer' 
+                      : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-60'
+                  ]"
+                >
+                  <span>{{ isIdentityLocked ? '🚀' : '🔒' }}</span>
+                  <span>Invia</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- List of Needs -->
+            <div class="p-2 flex-1 overflow-y-auto min-h-[180px]">
+              <div v-if="getNeedsByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
+                Nessuna richiesta attiva per questa sezione.
+              </div>
+              <div class="space-y-1.5">
+                <div 
+                  v-for="need in getNeedsByTopic(topic.id)" 
+                  :key="need.id" 
+                  :class="[
+                    'p-2.5 border rounded-lg transition', 
+                    need.status === 'resolved' ? 'bg-emerald-950/20 border-emerald-900/40 opacity-70' : 'bg-[#0d1117] border-[#30363d]'
+                  ]"
+                >
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-1.5 mb-1">
+                        <span v-if="need.status === 'resolved'" class="text-[9px] bg-emerald-950 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-800 uppercase font-bold">✓ Risolto</span>
+                        <span v-else :class="['text-[9px] font-bold px-1.5 py-0.2 rounded uppercase border', need.type === 'purchase' ? 'bg-indigo-950 text-indigo-300 border-indigo-800' : 'bg-amber-950 text-amber-300 border-amber-800']">
+                          {{ need.type === 'purchase' ? 'Acquisto' : 'Burocrazia' }}
+                        </span>
+                        <span class="text-[9px] text-[#8b949e]">da {{ getUserName(need.createdBy) }}</span>
+                      </div>
+                      <div :class="['text-xs font-bold mb-0.5', need.status === 'resolved' ? 'text-[#8b949e] line-through' : 'text-white']">{{ need.title }}</div>
+                      <div v-if="need.details" class="text-[11px] text-[#8b949e] truncate">{{ need.details }}</div>
+                    </div>
                     
-                    <button 
-                      @click="deleteNeed(need.id)" 
-                      :disabled="!isIdentityLocked"
-                      :class="[
-                        'text-[9px] px-1 py-0.5 transition',
-                        isIdentityLocked ? 'text-red-400 hover:underline cursor-pointer' : 'text-gray-600 cursor-not-allowed opacity-40'
-                      ]"
-                    >
-                      Elimina
-                    </button>
+                    <div v-if="canManageTopic(topic)" class="flex flex-col items-end gap-1 shrink-0">
+                      <button 
+                        v-if="currentUser.role === 'chief' && need.status === 'pending'" 
+                        @click="resolveNeed(need.id)" 
+                        :disabled="!isIdentityLocked"
+                        :class="[
+                          'text-[9px] px-2 py-1 rounded border font-bold transition flex items-center gap-1',
+                          isIdentityLocked 
+                            ? 'bg-emerald-950 text-emerald-300 border-emerald-700 hover:bg-emerald-900 cursor-pointer' 
+                            : 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed opacity-50'
+                        ]"
+                      >
+                        <span>{{ isIdentityLocked ? '✓' : '🔒' }}</span>
+                        <span>Risolvi</span>
+                      </button>
+                      
+                      <button 
+                        @click="deleteNeed(need.id)" 
+                        :disabled="!isIdentityLocked"
+                        :class="[
+                          'text-[9px] px-1 py-0.5 transition',
+                          isIdentityLocked ? 'text-red-400 hover:underline cursor-pointer' : 'text-gray-600 cursor-not-allowed opacity-40'
+                        ]"
+                      >
+                        Elimina
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
         </div>
+      </section>
 
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="mt-8 mb-4 pt-4 border-t border-[#30363d] text-xs text-[#8b949e]">
+      <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+        <div class="flex items-center gap-2">
+          <span class="text-emerald-400">🔬</span>
+          <span>LabHub Portal // Dipartimento 2026</span>
+        </div>
+        <div>
+          Stato Identità: 
+          <strong :class="isIdentityLocked ? 'text-emerald-400' : 'text-amber-400'">
+            {{ isIdentityLocked ? '🔒 Bloccata' : '🔓 Sbloccata (Azioni Disabilitate)' }}
+          </strong>
+        </div>
       </div>
-    </section>
-
-  </main>
-
-  <!-- FOOTER -->
-  <footer class="mt-8 mb-4 pt-4 border-t border-[#30363d] text-xs text-[#8b949e]">
-    <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
-      <div class="flex items-center gap-2">
-        <span class="text-emerald-400">🔬</span>
-        <span>LabHub Portal // Dipartimento 2026</span>
-      </div>
-      <div>
-        Stato Identità: 
-        <strong :class="isIdentityLocked ? 'text-emerald-400' : 'text-amber-400'">
-          {{ isIdentityLocked ? '🔒 Bloccata' : '🔓 Sbloccata (Azioni Disabilitate)' }}
-        </strong>
-      </div>
-    </div>
-  </footer>
-
+    </footer>
+  </template>
 </div>
 
 <script>
@@ -855,7 +905,35 @@
         }
       };
 
-      // Setup Realtime Sync Listener
+      const isAuthenticated = ref(false);
+      const loginEmail = ref('');
+      const loginPassword = ref('');
+      const authError = ref('');
+      const isLoggingIn = ref(false);
+
+      // Metodo di Login
+      const login = async () => {
+        authError.value = '';
+        isLoggingIn.value = true;
+        try {
+          const { getAuth, signInWithEmailAndPassword } = window.FirebaseInit;
+          const auth = getAuth();
+          await signInWithEmailAndPassword(auth, loginEmail.value, loginPassword.value);
+          loginPassword.value = '';
+        } catch (err) {
+          authError.value = "Credenziali errate o utente non trovato.";
+        } finally {
+          isLoggingIn.value = false;
+        }
+      };
+
+      // Metodo di Logout
+      const logout = async () => {
+        const { getAuth, signOut } = window.FirebaseInit;
+        await signOut(getAuth());
+      };
+
+      // Aggiorna setupRealtimeSync per ascoltare lo stato dell'autenticazione
       const setupRealtimeSync = async () => {
         try {
           if (!window.FirebaseInit) return;
@@ -869,37 +947,38 @@
             appId: "1:764223595413:web:52ce77d768ba553a58cc9c"
           };
 
-          const { initializeApp, getAuth, signInAnonymously, getFirestore, doc, setDoc, onSnapshot } = window.FirebaseInit;
-
+          const { initializeApp, getAuth, onAuthStateChanged, getFirestore, doc, onSnapshot } = window.FirebaseInit;
           const app = initializeApp(firebaseConfig);
           const auth = getAuth(app);
           const db = getFirestore(app);
 
-          await signInAnonymously(auth);
-
-          // Shared database document reference
-          const docRef = doc(db, 'labhub', 'portal_state');
           window.dbInstance = db;
+          const docRef = doc(db, 'labhub', 'portal_state');
           window.syncDocRef = docRef;
 
-          // Realtime Snapshot Listener
-          onSnapshot(docRef, (snapshot) => {
-            if (snapshot.exists()) {
-              const data = snapshot.data();
-              isUpdatingFromRemote = true;
-              needs.value = data.needs || [];
-              deadlines.value = data.deadlines || [];
-              analyses.value = data.analyses || [];
-              syncStatus.value = 'live';
-              
-              setTimeout(() => { isUpdatingFromRemote = false; }, 100);
+          // Ascolta se l'utente è loggato o meno
+          onAuthStateChanged(auth, (user) => {
+            if (user) {
+              isAuthenticated.value = true;
+              // Avvia l'ascolto in tempo reale solo se l'utente è autenticato
+              onSnapshot(docRef, (snapshot) => {
+                if (snapshot.exists()) {
+                  const data = snapshot.data();
+                  isUpdatingFromRemote = true;
+                  needs.value = data.needs || [];
+                  deadlines.value = data.deadlines || [];
+                  analyses.value = data.analyses || [];
+                  syncStatus.value = 'live';
+                  setTimeout(() => { isUpdatingFromRemote = false; }, 100);
+                }
+              }, (error) => {
+                console.warn("Errore di permessi o di rete:", error);
+                syncStatus.value = 'local';
+              });
             } else {
-              pushStateToCloud();
-              syncStatus.value = 'live';
+              isAuthenticated.value = false;
+              syncStatus.value = 'local';
             }
-          }, (error) => {
-            console.warn("Errore listener Firestore (passaggio a locale):", error);
-            syncStatus.value = 'local';
           });
 
         } catch (error) {
@@ -1133,7 +1212,8 @@
         pendingNeeds, pendingPurchases, pendingBureaucracy, upcomingDeadlines,
         getDeadlinesByTopic, getNeedsByTopic,
         addAnalysis, toggleAnalysis, deleteAnalysis,
-        addDeadline, deleteDeadline, addNeed, resolveNeed, deleteNeed
+        addDeadline, deleteDeadline, addNeed, resolveNeed, deleteNeed, 
+        isAuthenticated, loginEmail, loginPassword, authError, isLoggingIn, login, logout
       };
     }
   }).mount('#app');
