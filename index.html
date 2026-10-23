@@ -31,6 +31,24 @@
     }
   </script>
 
+  <style>
+  /* Forza lo sfondo e il testo chiaro quando la classe 'dark' viene rimossa */
+  html:not(.dark) body, 
+  html:not(.dark) #app {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  html:not(.dark) .bg-\[\#161b22\], 
+  html:not(.dark) .bg-\[\#0d1117\] {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #e2e8f0 !important;
+  }
+  html:not(.dark) .text-white {
+    color: #0f172a !important;
+  }
+  </style>
+
   <!-- Vue 3 CDN -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
@@ -148,7 +166,7 @@
                 :title="syncStatus === 'live' ? 'Sincronizzazione cloud istantanea attiva per PC e smartphone' : 'Modalità memoria locale'"
               >
                 <span class="w-1.5 h-1.5 rounded-full" :class="syncStatus === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
-                <span>{{ syncStatus === 'live' ? 'LIVE SYNC' : 'LOCAL' }}</span>
+                <span>{{ syncStatus === 'live' ? 'SYNC' : 'LOCAL' }}</span>
               </span>
             </div>
             <p class="text-[10px] sm:text-xs text-[#8b949e] truncate">Gestionale Gruppo Ice Memory</p>
@@ -223,19 +241,13 @@
           </button>
 
           <!-- Bottone Light/Dark Mode -->
-          <button @click="toggleTheme" 
-                  class="ml-3 p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" 
-                  :title="isLightMode ? 'Torna al tema scuro' : 'Passa al tema chiaro'">
-            
-            <!-- Icona Luna (mostrata quando è Light Mode per tornare al Dark) -->
-            <svg v-if="isLightMode" class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-            </svg>
-            
-            <!-- Icona Sole (mostrata quando è Dark Mode per passare al Light) -->
-            <svg v-else class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-            </svg>
+          <button 
+            @click="toggleTheme" 
+            class="p-2 text-[#8b949e] hover:text-white transition"
+            :title="isDarkMode ? 'Passa a Light Mode' : 'Passa a Dark Mode'"
+          >
+            <span v-if="isDarkMode">☀️</span>
+            <span v-else>🌙</span>
           </button>
         </div>
       </header>
