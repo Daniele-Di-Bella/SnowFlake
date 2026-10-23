@@ -91,7 +91,7 @@
         <div class="text-center space-y-1">
           <span class="text-4xl">❄️</span>
           <h2 class="text-xl font-bold text-white">Accesso Riservato</h2>
-          <p class="text-xs text-[#8b949e]">Inserisci le tue credenziali di laboratorio per accedere a SnowFlake</p>
+          <p class="text-xs text-[#8b949e]">Inserisci le tue credenziali UniVE o ISP e la password per accedere a SnowFlake</p>
         </div>
 
         <form @submit.prevent="login" class="space-y-3">
@@ -101,7 +101,7 @@
               v-model="loginEmail" 
               type="email" 
               required 
-              placeholder="collega@laboratorio.it" 
+              placeholder="nome.cognome@unive/cnr.it" 
               class="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none"
             >
           </div>
@@ -151,7 +151,7 @@
                 <span>{{ syncStatus === 'live' ? 'LIVE SYNC' : 'LOCAL' }}</span>
               </span>
             </div>
-            <p class="text-[10px] sm:text-xs text-[#8b949e] truncate">Gestione Dipartimento & Laboratori</p>
+            <p class="text-[10px] sm:text-xs text-[#8b949e] truncate">Gestionale Gruppo Ice Memory</p>
           </div>
         </div>
 
@@ -293,7 +293,7 @@
           </div>
           <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-4 shadow-sm flex justify-between items-center">
             <div>
-              <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Burocrazia In Attesa</div>
+              <div class="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider mb-1">Documenti In Attesa</div>
               <div class="text-2xl font-bold text-white">{{ pendingBureaucracy.length }}</div>
             </div>
             <span class="text-2xl opacity-50">📄</span>
@@ -326,7 +326,7 @@
 
           <div v-if="pendingNeeds.length === 0" class="p-8 text-center text-[#8b949e] text-xs">
             <div class="text-3xl mb-2">✅</div>
-            <p>Tutto aggiornato! Nessuna richiesta in attesa nel laboratorio.</p>
+            <p>Tutto aggiornato! Nessuna richiesta attesa dal gruppo.</p>
           </div>
 
           <div v-else class="divide-y divide-[#30363d]">
@@ -337,7 +337,7 @@
                     'text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wide border',
                     need.type === 'purchase' ? 'bg-indigo-950 text-indigo-300 border-indigo-800' : 'bg-amber-950 text-amber-300 border-amber-800'
                   ]">
-                    {{ need.type === 'purchase' ? '💳 Acquisto' : '📄 Burocrazia' }}
+                    {{ need.type === 'purchase' ? '💳 Acquisto' : '📄 Documenti' }}
                   </span>
                   <span class="text-[10px] text-[#8b949e] bg-[#0d1117] px-2 py-0.5 rounded border border-[#30363d]">
                     {{ getTopicName(need.topicId) }}
@@ -432,7 +432,7 @@
             <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
               <span>{{ topic.icon }}</span> {{ topic.name }}
             </h2>
-            <p class="text-xs text-[#8b949e] mt-0.5">Sezione Operativa e Attività</p>
+            <p class="text-xs text-[#8b949e] mt-0.5">Pagina Operativa</p>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs text-[#8b949e] shrink-0">Referenti:</span>
@@ -449,7 +449,7 @@
         <div class="bg-[#161b22] border border-[#30363d] rounded-xl p-3.5 sm:p-4 shadow-sm space-y-2">
           <div class="flex items-center justify-between text-xs">
             <div class="flex items-center gap-2 font-bold text-white">
-              <span>🧪</span>
+              <span>⏯️</span>
               <span>Avanzamento Analisi & Esperimenti - {{ topic.name }}</span>
             </div>
             <span class="font-bold text-emerald-400 font-mono text-xs sm:text-sm">
@@ -500,14 +500,14 @@
                 v-model="newAnalysis.title" 
                 type="text" 
                 :disabled="!isIdentityLocked"
-                placeholder="Titolo dell'analisi (Es. Sequenziamento RNA-seq, Taratura laser)..." 
+                placeholder="Titolo dell'analisi/esperimento" 
                 class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
               <input 
                 v-model="newAnalysis.details" 
                 type="text" 
                 :disabled="!isIdentityLocked"
-                placeholder="Dettagli / Protocollo / Campioni..." 
+                placeholder="Dettagli" 
                 class="flex-1 bg-[#0d1117] border border-[#30363d] rounded-lg px-2.5 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
               <button 
@@ -596,7 +596,7 @@
           <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm flex flex-col">
             <div class="px-4 py-3 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between">
               <h3 class="text-xs font-bold text-white flex items-center gap-2">
-                <span>📅</span> ATTIVITÀ & SCADENZE
+                <span>📅</span> SCADENZE
               </h3>
               <span class="text-[10px] text-[#8b949e] font-mono">{{ getDeadlinesByTopic(topic.id).length }} elementi</span>
             </div>
@@ -674,7 +674,7 @@
           <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm flex flex-col">
             <div class="px-4 py-3 border-b border-[#30363d] bg-[#0d1117] flex items-center justify-between">
               <h3 class="text-xs font-bold text-white flex items-center gap-2">
-                <span>🛒</span> RICHIESTE ACQUISTI & BUROCRAZIA
+                <span>🛒</span> RICHIESTE ACQUISTI & DOCUMENTI
               </h3>
               <span class="text-[10px] text-[#8b949e] font-mono">{{ getNeedsByTopic(topic.id).length }} elementi</span>
             </div>
@@ -682,7 +682,7 @@
             <!-- Add Request Form -->
             <div v-if="canManageTopic(topic)" class="p-3 border-b border-[#30363d] bg-[#0d1117]/50 space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wide">INVIA RICHIESTA AL CAPO LAB</span>
+                <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wide">INVIA RICHIESTA A JACOPO, ANDREA E FABRIZIO</span>
                 <span v-if="!isIdentityLocked" class="text-[10px] text-amber-400 font-bold">🔒 Blocco identità richiesto</span>
               </div>
 
@@ -693,7 +693,7 @@
                   class="w-full sm:w-32 bg-[#0d1117] border border-[#30363d] rounded-lg px-2 py-2 text-xs text-white focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
                   <option value="purchase">Acquisto</option>
-                  <option value="admin">Burocrazia</option>
+                  <option value="admin">Documenti</option>
                 </select>
                 <input 
                   v-model="newNeed.title" 
@@ -747,7 +747,7 @@
                       <div class="flex items-center gap-1.5 mb-1">
                         <span v-if="need.status === 'resolved'" class="text-[9px] bg-emerald-950 text-emerald-400 px-1.5 py-0.2 rounded border border-emerald-800 uppercase font-bold">✓ Risolto</span>
                         <span v-else :class="['text-[9px] font-bold px-1.5 py-0.2 rounded uppercase border', need.type === 'purchase' ? 'bg-indigo-950 text-indigo-300 border-indigo-800' : 'bg-amber-950 text-amber-300 border-amber-800']">
-                          {{ need.type === 'purchase' ? 'Acquisto' : 'Burocrazia' }}
+                          {{ need.type === 'purchase' ? 'Acquisto' : 'Documenti' }}
                         </span>
                         <span class="text-[9px] text-[#8b949e]">da {{ getUserName(need.createdBy) }}</span>
                       </div>
@@ -797,14 +797,23 @@
     <footer class="mt-8 mb-4 pt-4 border-t border-[#30363d] text-xs text-[#8b949e]">
       <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
         <div class="flex items-center gap-2">
-          <span class="text-emerald-400">🔬</span>
-          <span>LabHub Portal // Dipartimento 2026</span>
+          <span class="text-emerald-400">❄️</span>
+          <span>SnowFlake // Made with ❤️ by Daniele Di Bella</span>
         </div>
-        <div>
-          Stato Identità: 
-          <strong :class="isIdentityLocked ? 'text-emerald-400' : 'text-amber-400'">
-            {{ isIdentityLocked ? '🔒 Bloccata' : '🔓 Sbloccata (Azioni Disabilitate)' }}
-          </strong>
+        <!-- Icone Social -->
+        <div class="flex items-center gap-4">
+          <!-- LinkedIn -->
+          <a href="https://www.linkedin.com/in/daniele-di-bella" target="_blank" rel="noopener noreferrer" class="text-[#8b949e] hover:text-emerald-400 transition" title="LinkedIn">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          </a>
+          <!-- GitHub -->
+          <a href="https://github.com/Daniele-Di-Bella" target="_blank" rel="noopener noreferrer" class="text-[#8b949e] hover:text-emerald-400 transition" title="GitHub">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          </a>
+          <!-- BlueSky -->
+          <a href="https://bsky.app/profile/danieledibella.bsky.social" target="_blank" rel="noopener noreferrer" class="text-[#8b949e] hover:text-emerald-400 transition" title="BlueSky">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 10.8c-1.087-2.114-5.713-6.395-8.64-7.422C.937 2.288 0 4.618 0 5.682c0 2.37.525 6.326 2.062 8.35.438.572.937 1 1.706 1.056 2.043.14 4.502-.452 4.502-.452-4.102 1.637-4.195 4.962-1.093 6.945 2.147 1.371 4.82 0 4.82 0s2.673 1.371 4.82 0c3.102-1.983 3.01-5.308-1.093-6.945 0 0 2.459.592 4.502.452.769-.056 1.268-.484 1.706-1.056 1.537-2.024 2.062-5.98 2.062-8.35 0-1.064-.937-3.394-3.36-2.304-2.927 1.027-7.553 5.308-8.64 7.422z"/></svg>
+          </a>
         </div>
       </div>
     </footer>
