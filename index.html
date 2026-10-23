@@ -31,22 +31,64 @@
     }
   </script>
 
+  <!-- CSS PER IL LIGHT MODE (Aggiornato) -->
   <style>
-  /* Forza lo sfondo e il testo chiaro quando la classe 'dark' viene rimossa */
-  html:not(.dark) body, 
-  html:not(.dark) #app {
-    background-color: #f8fafc !important;
-    color: #0f172a !important;
-  }
-  html:not(.dark) .bg-\[\#161b22\], 
-  html:not(.dark) .bg-\[\#0d1117\] {
-    background-color: #ffffff !important;
-    color: #0f172a !important;
-    border-color: #e2e8f0 !important;
-  }
-  html:not(.dark) .text-white {
-    color: #0f172a !important;
-  }
+    /* 1. Sfondo e testo base in Light Mode */
+    html:not(.dark) body, 
+    html:not(.dark) #app {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+
+    /* 2. Sfondi principali, schede e bordi generali */
+    html:not(.dark) .bg-\[\#161b22\], 
+    html:not(.dark) .bg-\[\#0d1117\] {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      border-color: #e2e8f0 !important;
+    }
+
+    /* 3. Testi bianchi generalizzati */
+    html:not(.dark) .text-white {
+      color: #0f172a !important;
+    }
+
+    /* Riquadro della pagina/tab selezionata */
+    html:not(.dark) .bg-\[\#21262d\] {
+      background-color: #e2e8f0 !important; /* Grigio/bianco leggermente più scuro */
+      color: #0f172a !important;
+      border-color: #10b981 !important;
+    }
+
+    /* Badge percentuale nella scheda PANORAMICA (Invertito verde/bianco) */
+    html:not(.dark) .bg-emerald-950 {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      border-color: #cbd5e1 !important;
+    }
+    html:not(.dark) .bg-emerald-950 .text-emerald-400,
+    html:not(.dark) .bg-emerald-950/60,
+    html:not(.dark) .bg-emerald-950/80 {
+      color: #0f172a !important;
+    }
+
+    /* Riquardi e moduli sottostanti nelle sezioni operative */
+    html:not(.dark) .bg-\[\#0d1117\]\/50,
+    html:not(.dark) .bg-\[\#21262d\]\/50 {
+      background-color: #f1f5f9 !important; /* Grigio chiarissimo armonioso */
+      border-color: #e2e8f0 !important;
+    }
+
+    /* Campi di input e select nelle sezioni operative */
+    html:not(.dark) input, 
+    html:not(.dark) select {
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      border-color: #cbd5e1 !important;
+    }
+    html:not(.dark) input::placeholder {
+      color: #94a3b8 !important;
+    }
   </style>
 
   <!-- Vue 3 CDN -->
