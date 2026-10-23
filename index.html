@@ -221,6 +221,22 @@
               {{ isIdentityLocked ? 'Bloccato' : 'Sbloccato' }}
             </span>
           </button>
+
+          <!-- Bottone Light/Dark Mode -->
+          <button @click="toggleTheme" 
+                  class="ml-3 p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" 
+                  :title="isLightMode ? 'Torna al tema scuro' : 'Passa al tema chiaro'">
+            
+            <!-- Icona Luna (mostrata quando è Light Mode per tornare al Dark) -->
+            <svg v-if="isLightMode" class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+            </svg>
+            
+            <!-- Icona Sole (mostrata quando è Dark Mode per passare al Light) -->
+            <svg v-else class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -988,6 +1004,15 @@
       };
 
       onMounted(() => {
+        // Ripristino tema
+        const savedTheme = localStorage.getItem('theme_preference');
+        if (savedTheme === 'light') {
+          isDarkMode.value = false;
+          document.documentElement.classList.remove('dark');
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+
         // Load local backup state
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (saved) {
@@ -1119,6 +1144,20 @@
           .sort((a, b) => (a.status === b.status ? 0 : a.status === 'pending' ? -1 : 1));
       };
 
+      // --- GESTIONE TEMA (LIGHT/DARK) ---
+      const isDarkMode = ref(true);
+
+      const toggleTheme = () => {
+        isDarkMode.value = !isDarkMode.value;
+        if (isDarkMode.value) {
+          document.documentElement.classList.add('dark');
+          localStorage.setItem('theme_preference', 'dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+          localStorage.setItem('theme_preference', 'light');
+        }
+      };
+
       // --- 6. USER ACTIONS ---
       const addAnalysis = (topicId) => {
         if (!isIdentityLocked.value) return;
@@ -1206,6 +1245,7 @@
  
       return {
         users, topics, currentUser, activeTab, isIdentityDropdownOpen, isIdentityLocked, syncStatus,
+        isDarkMode, toggleTheme,
         selectUser, toggleIdentityLock, canManageTopic, getUserName, getUserEmoji, getTopicName, formatDate,
         needs, deadlines, analyses, newDeadline, newNeed, newAnalysis,
         globalAnalysisProgress, getTopicAnalysisProgress, getAnalysesByTopic,
