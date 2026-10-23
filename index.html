@@ -231,6 +231,7 @@
         <p class="whitespace-normal">
           <strong>Identità non bloccata!</strong> Per eseguire o gestire qualsiasi azione seleziona l'utente e clicca sul lucchetto in alto a destra.
         </p>
+        <span class="text-base shrink-0">⚠️</span>
       </div>
     </div>
 
@@ -316,7 +317,7 @@
         <div class="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm">
           <div class="px-4 py-3 border-b border-[#30363d] flex items-center justify-between bg-[#0d1117]">
             <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-              <span>📥</span> Richieste in Attesa di Risoluzione
+              <span>📥</span> Richieste In Attesa
             </h2>
             <span class="text-[10px] text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800 font-bold">LIVE STATUS</span>
           </div>
@@ -376,9 +377,9 @@
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#30363d] pb-3">
             <div>
               <h2 class="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
-                <span>📊</span> Avanzamento Delle Analisi
+                <span>📊</span> Avanzamento Delle Attività
               </h2>
-              <p class="text-[11px] text-[#8b949e]">Tracciamento delle analisi di laboratorio condotte in ciascun gruppo</p>
+              <p class="text-[11px] text-[#8b949e]">Tracciamento delle attività per sezione</p>
             </div>
             <div class="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded border border-emerald-800 shrink-0 self-start sm:self-auto">
               Totale: {{ globalAnalysisProgress.completed }} / {{ globalAnalysisProgress.total }} Completate ({{ globalAnalysisProgress.percent }}%)
@@ -522,7 +523,7 @@
           <!-- List of Analyses -->
           <div class="p-3 divide-y divide-[#30363d]/50 space-y-2">
             <div v-if="getAnalysesByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
-              Nessuna analisi registrata per questa sezione. Aggiungi le analisi da condurre per aggiornare la barra di progresso!
+              Nessuna attività in programmma.
             </div>
 
             <div 
@@ -722,7 +723,7 @@
             <!-- List of Needs -->
             <div class="p-2 flex-1 overflow-y-auto min-h-[180px]">
               <div v-if="getNeedsByTopic(topic.id).length === 0" class="text-center text-[#8b949e] py-6 text-xs">
-                Nessuna richiesta attiva per questa sezione.
+                Nessuna richiesta all'attivo.
               </div>
               <div class="space-y-1.5">
                 <div 
