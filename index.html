@@ -132,7 +132,7 @@
     </div>
 
     <!-- HEADER -->
-    <template v-else></template>
+    <template v-else>
       <header class="py-4 border-b border-[#30363d] flex items-center justify-between gap-2 shrink-0">
         <div class="flex items-center gap-2 min-w-0 pr-1">
           <span class="text-xl sm:text-2xl shrink-0">❄️</span>
@@ -1203,7 +1203,7 @@
         if (!isIdentityLocked.value) return;
         needs.value = needs.value.filter(n => n.id !== id);
       };
-
+ 
       return {
         users, topics, currentUser, activeTab, isIdentityDropdownOpen, isIdentityLocked, syncStatus,
         selectUser, toggleIdentityLock, canManageTopic, getUserName, getUserEmoji, getTopicName, formatDate,
